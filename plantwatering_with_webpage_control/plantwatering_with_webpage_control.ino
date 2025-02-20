@@ -2,10 +2,11 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "time.h"
-
+#include <EEPROM.h>
 // Wi-Fi credentials
 const char *ssid = "ARTI";
-const char *password = "xxxxxxxx";
+const char *password = "xxxxxx";
+
 
 // NTP settings
 const char *ntpServer1 = "pool.ntp.org";
@@ -150,6 +151,22 @@ String processor(const String &var) {
   return String();
 }
 
+// ============ EEPROM Functions ============
+void saveSchedule() {
+  EEPROM.write(0, scheduledWday);
+  EEPROM.write(1, scheduledHour);
+  EEPROM.write(2, scheduledMinute);
+  EEPROM.commit();  // IMPORTANT: Saves data permanently!
+  Serial.println("Schedule saved to EEPROM.");
+}
+
+void loadSchedule() {
+  scheduledWday = EEPROM.read(0);
+  scheduledHour = EEPROM.read(1);
+  scheduledMinute = EEPROM.read(2);
+  Serial.printf("Loaded schedule from EEPROM: Day=%d, Hour=%d, Minute=%d\n", scheduledWday, scheduledHour, scheduledMinute);
+}
+
 // ============ Automatic Watering Function ============
 void checkWateringSchedule() {
   // Only run scheduled watering if manual override is NOT active.
@@ -205,6 +222,12 @@ void setup(){
   manualOverride = false;
   scheduledTriggered = false;
 
+  // Initialize EEPROM
+  EEPROM.begin(10);  // Set size (10 bytes for schedule data)
+
+  // Load schedule from EEPROM
+  loadSchedule();
+
   // Connect to WiFi
   Serial.printf("Connecting to %s\n", ssid);
   WiFi.begin(ssid, password);
@@ -247,6 +270,8 @@ void setup(){
       scheduledHour = request->getParam("hour")->value().toInt();
       scheduledMinute = request->getParam("minute")->value().toInt();
       Serial.printf("New schedule set: day=%d, hour=%d, minute=%d\n", scheduledWday, scheduledHour, scheduledMinute);
+      
+      saveSchedule();  // Save to EEPROM
     }
     // Redirect back to root page.
     request->redirect("/");
