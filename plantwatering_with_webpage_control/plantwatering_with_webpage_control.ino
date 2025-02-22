@@ -3,10 +3,17 @@
 #include <ESPAsyncWebServer.h>
 #include "time.h"
 #include <EEPROM.h>
-// Wi-Fi credentials
-const char *ssid = "ARTI";
-const char *password = "xxxxxx";
 
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_PCD8544.h>
+
+// Wi-Fi credentials
+//const char *ssid = "ARTI";
+//const char *password = "xxxxxx";
+
+const char *ssid = "Magenta9448572";
+const char *password = "b5n7hrj69mss";
 
 // NTP settings
 const char *ntpServer1 = "pool.ntp.org";
@@ -14,6 +21,9 @@ const char *ntpServer2 = "time.nist.gov";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 const char *time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone for Europe/Austria
+
+Adafruit_PCD8544 display = Adafruit_PCD8544(18, 23, 4, 15, 2);
+int contrastValue = 60; // Default Contrast Value
 
 // ============ Pin & Scheduling Settings ============
 const int WATER_PUMP_PIN = 13;
@@ -216,6 +226,10 @@ void checkWateringSchedule() {
 // ============ Setup ============
 void setup(){
   Serial.begin(115200);
+  display.begin();
+  display.setContrast(contrastValue);
+  display.clearDisplay();
+
   pinMode(WATER_PUMP_PIN, OUTPUT);
   digitalWrite(WATER_PUMP_PIN, LOW);
   waterPumpState = false;
@@ -237,6 +251,15 @@ void setup(){
   }
   Serial.println("Connected to WiFi");
   Serial.println(WiFi.localIP());
+
+  display.setCursor(15,0);
+  display.setTextSize(1);
+  display.println("Webserver");
+  display.setTextSize(1);
+  display.setTextColor(BLACK);
+  display.setCursor(10,10);
+  display.println(WiFi.localIP());
+  display.display();
 
   // Configure NTP (this will update the system time)
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
