@@ -4,6 +4,8 @@
 #include "time.h"
 #include <EEPROM.h>
 
+#include <ElegantOTA.h>
+
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
@@ -44,6 +46,7 @@ bool manualOverride = false;      // When true, scheduled watering is disabled
 
 // New flag to ensure one trigger per scheduled minute.
 bool scheduledTriggered = false;
+//unsigned long ota_progress_millis = 0;
 
 // ============ Web Server Setup ============
 AsyncWebServer server(80);
@@ -325,6 +328,8 @@ void setup(){
     request->send(200, "application/json", json);
   });
 
+  ElegantOTA.begin(&server);    // Start ElegantOTA
+
   // Start the web server.
   server.begin();
 }
@@ -333,5 +338,6 @@ void setup(){
 void loop(){
   // Check the scheduled watering every second.
   checkWateringSchedule();
+  ElegantOTA.loop();
   delay(1000);
 }
