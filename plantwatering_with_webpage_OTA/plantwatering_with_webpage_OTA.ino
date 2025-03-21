@@ -2,20 +2,10 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "time.h"
-#include <EEPROM.h>
-
-#include <ElegantOTA.h>
-
-#include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_PCD8544.h>
 
 // Wi-Fi credentials
 const char *ssid = "ARTI";
-const char *password = "xxxxxxx";
-
-//const char *ssid = "Magenta9448572";
-//const char *password = "b5n7hrj69mss";
+const char *password = "xxxxx";
 
 // NTP settings
 const char *ntpServer1 = "pool.ntp.org";
@@ -23,9 +13,6 @@ const char *ntpServer2 = "time.nist.gov";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 const char *time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone for Europe/Austria
-
-Adafruit_PCD8544 display = Adafruit_PCD8544(18, 23, 4, 15, 2); //clk, din,dc,ce ,rst
-int contrastValue = 60; // Default Contrast Value
 
 // ============ Pin & Scheduling Settings ============
 const int WATER_PUMP_PIN = 13;
@@ -37,7 +24,7 @@ int scheduledHour     = 14;
 int scheduledMinute   = 0;
 const int scheduledSecStart = 0;
 const int scheduledSecEnd   = 30;
-const unsigned long wateringDuration = 12000;  // Automatic watering lasts 12 seconds
+const unsigned long wateringDuration = 8000;  // Automatic watering lasts 8 seconds
 
 // Flags for scheduled watering and manual override
 bool scheduledWateringActive = false;
@@ -46,7 +33,6 @@ bool manualOverride = false;      // When true, scheduled watering is disabled
 
 // New flag to ensure one trigger per scheduled minute.
 bool scheduledTriggered = false;
-//unsigned long ota_progress_millis = 0;
 
 // ============ Web Server Setup ============
 AsyncWebServer server(80);
@@ -164,22 +150,6 @@ String processor(const String &var) {
   return String();
 }
 
-// ============ EEPROM Functions ============
-void saveSchedule() {
-  EEPROM.write(0, scheduledWday);
-  EEPROM.write(1, scheduledHour);
-  EEPROM.write(2, scheduledMinute);
-  EEPROM.commit();  // IMPORTANT: Saves data permanently!
-  Serial.println("Schedule saved to EEPROM.");
-}
-
-void loadSchedule() {
-  scheduledWday = EEPROM.read(0);
-  scheduledHour = EEPROM.read(1);
-  scheduledMinute = EEPROM.read(2);
-  Serial.printf("Loaded schedule from EEPROM: Day=%d, Hour=%d, Minute=%d\n", scheduledWday, scheduledHour, scheduledMinute);
-}
-
 // ============ Automatic Watering Function ============
 void checkWateringSchedule() {
   // Only run scheduled watering if manual override is NOT active.
@@ -229,21 +199,11 @@ void checkWateringSchedule() {
 // ============ Setup ============
 void setup(){
   Serial.begin(115200);
-  display.begin();
-  display.setContrast(contrastValue);
-  display.clearDisplay();
-
   pinMode(WATER_PUMP_PIN, OUTPUT);
   digitalWrite(WATER_PUMP_PIN, LOW);
   waterPumpState = false;
   manualOverride = false;
   scheduledTriggered = false;
-
-  // Initialize EEPROM
-  EEPROM.begin(10);  // Set size (10 bytes for schedule data)
-
-  // Load schedule from EEPROM
-  loadSchedule();
 
   // Connect to WiFi
   Serial.printf("Connecting to %s\n", ssid);
@@ -254,26 +214,10 @@ void setup(){
   }
   Serial.println("Connected to WiFi");
   Serial.println(WiFi.localIP());
- /*
-  display.setCursor(15,0); // column,row
-  display.setTextSize(1);
-  display.println("Webserver");
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(0,10);
-  display.println(WiFi.localIP());
 
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(10,40);
-  display.println("ip/firmware");
-
-  display.display();
- */
   // Configure NTP (this will update the system time)
-  //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
   // Optionally, use: configTzTime(time_zone, ntpServer1, ntpServer2);
-  configTzTime(time_zone, ntpServer1, ntpServer2); // automatically adjust for daylight saving time.
 
   // Web server endpoint for root page.
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -303,8 +247,6 @@ void setup(){
       scheduledHour = request->getParam("hour")->value().toInt();
       scheduledMinute = request->getParam("minute")->value().toInt();
       Serial.printf("New schedule set: day=%d, hour=%d, minute=%d\n", scheduledWday, scheduledHour, scheduledMinute);
-      
-      saveSchedule();  // Save to EEPROM
     }
     // Redirect back to root page.
     request->redirect("/");
@@ -335,8 +277,6 @@ void setup(){
     request->send(200, "application/json", json);
   });
 
-  ElegantOTA.begin(&server);    // Start ElegantOTA
-
   // Start the web server.
   server.begin();
 }
@@ -345,50 +285,5 @@ void setup(){
 void loop(){
   // Check the scheduled watering every second.
   checkWateringSchedule();
-  ElegantOTA.loop();
-
-  display.begin();
-  display.setContrast(contrastValue);
-  display.clearDisplay();
-  display.setCursor(15,0); // column,row
-  display.setTextSize(1);
-  display.println("Webserver");
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(0,10);
-  display.println(WiFi.localIP());
-
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(10,40);
-  display.println("ip/firmware");
-
-
-  // Fetch the current time
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-
-        // Format the day (only the day number)
-        char dayStr[3];  // Max "31" + null terminator
-        strftime(dayStr, sizeof(dayStr), "%d", &timeinfo);
-        
-        // Format the time (HH:MM:SS)
-        char timeStr[10];  
-        strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
-        
-        // Print "Date: 20"
-        display.setCursor(20, 23);  // X, Y position
-        display.setTextSize(1);
-        display.setTextColor(BLACK);
-        display.print("Date: ");
-        display.println(dayStr);
-        
-        // Print "14:35:10" below the date
-        display.setCursor(19, 33);
-        display.println(timeStr);
-
-        
-    }
-  display.display();
-  delay(1000); // Update every second
+  delay(1000);
 }
